@@ -1,0 +1,130 @@
+<!--
+  ============================================================
+  DEVELOPER NOTE — YE PAGE ABHI LIVE NAHI HAI, BACKEND JODNA BAAKI HAI:
+  (8 Nov 2026 ko update — recovery-code wala purana design KHATAM:
+   app me recovery code hai hi nahi; verification ab account ke
+   sign-in email par bheje gaye code se hota hai.)
+  1. Is page ka form abhi kahin submit NAHI hota (jaankari wala taiyaar roop hai).
+     Launch se pehle ek public web endpoint chahiye jo:
+     (a) user ke diye sign-in email par verification code bheje — jawab
+         email ho ya na ho, ek jaisa plain ho (koi account-leak na ho);
+     (b) code ko surakshit roop se verify kare (backend ka OTP system
+         taiyaar hai: crypto-random code, sirf hash store, 5 galat = 1 ghanta
+         pause, code ki chhoti expiry) — galat code par koi jaankari na dikhe;
+     (c) code sahi hone par account ki ginatiyan (posts/books/saves ki
+         sankhya) dikhaye;
+     (d) do baar ki pushti ke baad asal deletion kare (in-app
+         account-delete wali hi prakriya: content, settings, sign-in
+         record, account record — sab wipe; uske baad wohi email/password
+         se sign-in na chale) aur us email par pushti bheje.
+     Code asal me email par tabhi pahunchega jab email provider ke secrets
+     (EMAIL_SEND_URL + EMAIL_SEND_KEY) jude hon — woh Hy ka kadam hai
+     (LAUNCH_CHECKLIST point 21); bina uske endpoint imaandaar "not set up"
+     jawab dega, nakli safalta kabhi nahi.
+  2. Page host karne ka URL tay hona baaki hai — wahi URL Play Console ke
+     "Data deletion" hisse me aur Privacy Policy §10.2 me jayega.
+  3. Grievance Officer ka published naam pakka hai (9 Nov 2026, Hy ka sudhaar):
+     officer ka asal naam "Daksh" (sirf Daksh, koi surname nahi, koi shahar nahi —
+     neeche Section 6); public desk pehchan "DeepThought Helpline" hi rahegi;
+     contact email: deepthoughthelpline@gmail.com.
+  Kuch bhi publish/host NAHI karna jab tak upar ke 1–2 pure na hon.
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete your DeepThought account — from the web</title>
+<style>
+  body { font-family: Georgia, 'Times New Roman', serif; background: #F1EFE5; color: #222; margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 36px; }
+  p, li { line-height: 1.6; font-size: 15px; }
+  .warn { background: #fdf3e3; border: 1px solid #e0b45c; padding: 12px 16px; border-radius: 8px; }
+  form { background: #F1EFE5; padding: 20px; border-radius: 10px; margin-top: 20px; }
+  label { display: block; margin: 14px 0 6px; font-weight: bold; font-size: 14px; }
+  input[type="email"] { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; border: 1px solid #bbb; border-radius: 6px; }
+  input[type="text"] { width: 100%; box-sizing: border-box; padding: 10px; font-size: 18px; letter-spacing: 3px; border: 1px solid #bbb; border-radius: 6px; }
+  button { background: #157347; color: #fff; border: 0; padding: 12px 22px; font-size: 16px; border-radius: 8px; margin-top: 18px; cursor: pointer; }
+  button:disabled { background: #9db8a9; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<main>
+<h1>Delete your DeepThought account — from the web</h1>
+
+<h2>1. What this page is for</h2>
+<p>1.1 The normal way to delete a DeepThought account is inside the app: <strong>Profile → Settings → Delete account</strong>. That works instantly and is the route we recommend.</p>
+<p>1.2 This web page exists for one situation: <strong>you cannot open the app</strong> — for example, your phone is lost, broken, or replaced — but you still want your DeepThought account and everything in it deleted.</p>
+<p>1.3 To prove an account is yours on this page, we use the <strong>email address you signed up with</strong>. We send a short verification code to that email address; entering the code proves you control the account's own sign-in, and nothing else is asked. If you never added an email sign-in to your account, Section 5 explains your options honestly.</p>
+
+<h2>2. Before you start — please read this</h2>
+<p class="warn">2.1 <strong>Deletion is permanent and cannot be undone.</strong> There is no "restore a deleted account", for anyone, ever. Once the steps below are completed, the account and its content are gone.</p>
+<p>2.2 If you might want your writing later, first use <strong>account export</strong> inside the app (Profile → Settings) to save a copy. Export is not possible from this web page.</p>
+<p>2.3 <strong>Deleting your account does not cancel a Premium subscription.</strong> Premium is billed by Google Play. If you bought Premium and do not want to be charged again, cancel the subscription in your Google Play account (Play Store → Subscriptions) as a separate step. We cannot cancel a Play subscription for you.</p>
+<p>2.4 You will need:</p>
+<ul>
+<li>(a) the <strong>email address you signed up with</strong>; and</li>
+<li>(b) access to that email inbox, to receive the verification code.</li>
+</ul>
+<p>This page never asks for your password, your name, your phone number, or any ID document.</p>
+
+<h2>3. Step by step</h2>
+<p><strong>Step 1 — Begin.</strong> Use the form below and choose <strong>"Delete my account"</strong>. Read what deletion removes, and continue only if you are sure.</p>
+<p><strong>Step 2 — Enter your sign-in email.</strong> Type the email address you signed up with. The page answers in the same plain way whether or not the address matches an account, so nothing about anyone's account is revealed.</p>
+<p><strong>Step 3 — Enter the verification code.</strong> If the address matches an account, a short verification code is sent to that email address. Enter the code on this page. For your protection: if the code is wrong, nothing is deleted and nothing about any account is shown — the page simply says the code was not recognised. After five wrong attempts, this page pauses further attempts for one hour, so a stranger cannot keep guessing. The code expires after a short time; if it expires, you can ask for a new one.</p>
+<p><strong>Step 4 — See exactly what will be deleted.</strong> Once the code is verified, a confirmation screen lists what belongs to the account in counts only (for example: number of posts, books, and saved items) — never the content itself, and never anything that identifies you. This is your last chance to stop.</p>
+<p><strong>Step 5 — Confirm, twice.</strong> Deletion requires two separate confirmations (ticking "I understand this is permanent" and then pressing "Delete permanently"). One accidental tap can never delete an account.</p>
+<p><strong>Step 6 — Deletion is carried out.</strong> When you confirm, the account is deleted as described in Section 4. A confirmation is sent to the account's email address so you have a record that it happened.</p>
+<p><strong>Step 7 — The sign-in stops working.</strong> After deletion, that email address and password will no longer sign in to anything, because there is nothing left to sign in to. If you later install DeepThought again, you will begin with a brand-new, empty account.</p>
+
+<form id="delete-form" onsubmit="return false;">
+  <label for="account-email">The email address you signed up with</label>
+  <input type="email" id="account-email" name="account-email" autocomplete="email" placeholder="you@example.com">
+  <label for="verification-code">Verification code sent to that email</label>
+  <input type="text" id="verification-code" name="verification-code" maxlength="8" autocomplete="one-time-code" placeholder="________">
+  <label><input type="checkbox" id="understand"> I understand this is permanent and cannot be undone.</label>
+  <button type="submit" disabled>Delete my account</button>
+  <p><em>This form will be activated when this page goes live with its secure verification system. If you can open the app, please delete your account there instead: Profile → Settings → Delete account — that works today.</em></p>
+</form>
+
+<h2>4. What is deleted</h2>
+<p>4.1 When an account is deleted through this page, the following are removed:</p>
+<ul>
+<li>(a) all <strong>posts</strong> and <strong>books</strong> written by the account, including their pages;</li>
+<li>(b) all <strong>thoughts and echoes</strong> written by the account under other people's posts;</li>
+<li>(c) all <strong>saves, keeps, and private lists</strong> belonging to the account;</li>
+<li>(d) <strong>drafts and "Never Sent" letters</strong>;</li>
+<li>(e) <strong>settings and preferences</strong>, and reading progress;</li>
+<li>(f) the <strong>sign-in email and password record</strong>, if one was added;</li>
+<li>(g) the <strong>account record itself</strong>, including the material that recognised your device.</li>
+</ul>
+<p>4.2 Other users are not notified. Because no one ever saw your identity, there is no public profile or name to take down — deletion removes the underlying account and content.</p>
+<p>4.3 Two narrow exceptions, stated honestly:</p>
+<ul>
+<li>(a) moderation and safety records about serious rule violations may be kept for a limited period, privately, so a stopped account cannot return and repeat the same harm; and</li>
+<li>(b) a specific record may be kept where a valid legal order or law requires it — for example, the IT Rules, 2021 require removed content and account registration records to be preserved privately for 180 days for investigation purposes.</li>
+</ul>
+<p>Both exceptions are described in our Privacy Policy (Section 9), and neither keeps your posts readable by anyone.</p>
+
+<h2>5. If you never added an email sign-in</h2>
+<p>5.1 <strong>Your device still works?</strong> Open the app on it. The device will recognise your account, and you can delete instantly from Profile → Settings. No email is needed for this.</p>
+<p>5.2 <strong>Your device is gone and you never added an email sign-in?</strong> Then, honestly, this page cannot verify that the account is yours — there is no email attached to it, and the device was the only key. That limit is the other side of anonymity: the same design that stops a stranger from reading your account also stops anyone — including us, acting on a stranger's request — from deleting it without a key. If you believe your situation is exceptional, you may send a deletion request to the Grievance Officer (Section 6) from any email address, explaining the situation; we will reply and explain what, if anything, can be verified and done.</p>
+
+<h2>6. Help and grievances</h2>
+<p>6.1 If this page does not work for you, or you believe a deletion request was mishandled, contact the Grievance Officer for DeepThought:</p>
+<ul>
+<li>Name: Daksh</li>
+<li>Contact: DeepThought Helpline — deepthoughthelpline@gmail.com</li>
+<li>Country: India</li>
+</ul>
+<p>6.2 Grievances are acknowledged within <strong>24 hours</strong> and resolved within <strong>7 days</strong>, in accordance with the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021. If you are not satisfied with the decision, you may appeal to the Grievance Appellate Committee within 30 days of receiving it.</p>
+<p>6.3 Never send your password by email or to the Grievance Officer. No person at DeepThought needs it or will ever ask for it. Passwords are used only on the sign-in screen inside the app; verification codes are entered only on this page or inside the app.</p>
+
+<hr>
+<p><em>DeepThought is a moderated writing community. It is not a chat service, and it is not an anonymous or random chat app.</em></p>
+</main>
+</body>
+</html>
