@@ -1,33 +1,26 @@
 <!--
   ============================================================
-  DEVELOPER NOTE — YE PAGE ABHI LIVE NAHI HAI, BACKEND JODNA BAAKI HAI:
-  (8 Nov 2026 ko update — recovery-code wala purana design KHATAM:
-   app me recovery code hai hi nahi; verification ab account ke
-   sign-in email par bheje gaye code se hota hai.)
-  1. Is page ka form abhi kahin submit NAHI hota (jaankari wala taiyaar roop hai).
-     Launch se pehle ek public web endpoint chahiye jo:
-     (a) user ke diye sign-in email par verification code bheje — jawab
-         email ho ya na ho, ek jaisa plain ho (koi account-leak na ho);
-     (b) code ko surakshit roop se verify kare (backend ka OTP system
-         taiyaar hai: crypto-random code, sirf hash store, 5 galat = 1 ghanta
-         pause, code ki chhoti expiry) — galat code par koi jaankari na dikhe;
-     (c) code sahi hone par account ki ginatiyan (posts/books/saves ki
-         sankhya) dikhaye;
-     (d) do baar ki pushti ke baad asal deletion kare (in-app
-         account-delete wali hi prakriya: content, settings, sign-in
-         record, account record — sab wipe; uske baad wohi email/password
-         se sign-in na chale) aur us email par pushti bheje.
-     Code asal me email par tabhi pahunchega jab email provider ke secrets
-     (EMAIL_SEND_URL + EMAIL_SEND_KEY) jude hon — woh Hy ka kadam hai
-     (LAUNCH_CHECKLIST point 21); bina uske endpoint imaandaar "not set up"
-     jawab dega, nakli safalta kabhi nahi.
-  2. Page host karne ka URL tay hona baaki hai — wahi URL Play Console ke
-     "Data deletion" hisse me aur Privacy Policy §10.2 me jayega.
-  3. Grievance Officer ka published naam pakka hai (9 Nov 2026, Hy ka sudhaar):
-     officer ka asal naam "Daksh" (sirf Daksh, koi surname nahi, koi shahar nahi —
-     neeche Section 6); public desk pehchan "DeepThought Helpline" hi rahegi;
-     contact email: deepthoughthelpline@gmail.com.
-  Kuch bhi publish/host NAHI karna jab tak upar ke 1–2 pure na hon.
+  DEVELOPER NOTE — UPDATED 11 Nov 2026 (backend DEPLOYED, page not yet re-published):
+  The email-code backend for this page is now LIVE as the Supabase Edge
+  Function `account-delete-web`
+  (https://ywfqgtlzznnnqhpylcys.supabase.co/functions/v1/account-delete-web):
+    step 'request' (email) -> generic answer either way, 6-digit code
+      emailed via the mail-relay when the email holds an account;
+    step 'verify'  (email + code) -> single-use session token
+      (hash-only OTP, purpose 'delete', 5 wrong = 1 hour pause);
+    step 'confirm' (token) -> counts only (posts / books / thoughts);
+    step 'execute' (token + confirm 'DELETE') -> the SAME shared
+      deletion as the in-app account-delete; confirmation email after.
+  The form below is wired to that endpoint (anon key = the project's
+  public client key; all authority is server-side).
+  HONEST LIMIT: codes are actually DELIVERED only once the email
+  provider key (BREVO_API_KEY) is set on the backend and the sender is
+  verified — until then requests still answer generically, codes are
+  generated and stored, but no email leaves. Never fake success here.
+  Remaining launch steps: push this file to the deepthought-legal repo,
+  then put the page URL in Play Console's account-deletion field.
+  Grievance Officer (pakka, 9 Nov 2026): naam sirf "Daksh"; contact
+  deepthoughthelpline@gmail.com (see Section 6 below).
   ============================================================
 -->
 <!DOCTYPE html>
@@ -49,6 +42,11 @@
   input[type="text"] { width: 100%; box-sizing: border-box; padding: 10px; font-size: 18px; letter-spacing: 3px; border: 1px solid #bbb; border-radius: 6px; }
   button { background: #157347; color: #fff; border: 0; padding: 12px 22px; font-size: 16px; border-radius: 8px; margin-top: 18px; cursor: pointer; }
   button:disabled { background: #9db8a9; cursor: not-allowed; }
+  .step { display: none; }
+  .step.on { display: block; }
+  .msg { margin-top: 14px; font-size: 14px; }
+  .msg.err { color: #a12622; }
+  .counts { font-size: 16px; line-height: 1.7; }
 </style>
 </head>
 <body>
@@ -81,14 +79,108 @@
 <p><strong>Step 7 — The sign-in stops working.</strong> After deletion, that email address and password will no longer sign in to anything, because there is nothing left to sign in to. If you later install DeepThought again, you will begin with a brand-new, empty account.</p>
 
 <form id="delete-form" onsubmit="return false;">
-  <label for="account-email">The email address you signed up with</label>
-  <input type="email" id="account-email" name="account-email" autocomplete="email" placeholder="you@example.com">
-  <label for="verification-code">Verification code sent to that email</label>
-  <input type="text" id="verification-code" name="verification-code" maxlength="8" autocomplete="one-time-code" placeholder="________">
-  <label><input type="checkbox" id="understand"> I understand this is permanent and cannot be undone.</label>
-  <button type="submit" disabled>Delete my account</button>
-  <p><em>This form will be activated when this page goes live with its secure verification system. If you can open the app, please delete your account there instead: Profile → Settings → Delete account — that works today.</em></p>
+  <!-- Step 1: email -->
+  <div class="step on" id="step-1">
+    <label for="account-email">The email address you signed up with</label>
+    <input type="email" id="account-email" name="account-email" autocomplete="email" placeholder="you@example.com">
+    <button type="button" id="btn-request">Send me a code</button>
+  </div>
+  <!-- Step 2: code -->
+  <div class="step" id="step-2">
+    <label for="verification-code">Verification code sent to that email</label>
+    <input type="text" id="verification-code" name="verification-code" maxlength="8" autocomplete="one-time-code" placeholder="________">
+    <button type="button" id="btn-verify">Verify code</button>
+  </div>
+  <!-- Step 3: counts + double confirmation -->
+  <div class="step" id="step-3">
+    <p><strong>This account holds:</strong></p>
+    <p class="counts" id="counts"></p>
+    <label><input type="checkbox" id="understand"> I understand this is permanent and cannot be undone.</label>
+    <button type="button" id="btn-execute" disabled>Delete permanently</button>
+  </div>
+  <!-- Step 4: done -->
+  <div class="step" id="step-4">
+    <p><strong>Your account has been deleted.</strong> A confirmation has been sent to your email address. If you install DeepThought again, you will begin with a brand-new, empty account.</p>
+  </div>
+  <p class="msg" id="msg" role="status"></p>
+  <p><em>If you can open the app, you can also delete your account there instead: Profile → Settings → Delete account.</em></p>
 </form>
+<script>
+(function () {
+  var ENDPOINT = 'https://ywfqgtlzznnnqhpylcys.supabase.co/functions/v1/account-delete-web';
+  var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZnFndGx6em5ubnFocHlsY3lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5ODk4MzIsImV4cCI6MjEwOTU2NTgzMn0.ay0VTAsCNV09kcriJyeI4dzMi0Kf2cXP-pkNKl6dGGI';
+  var token = null;
+  var emailEl = document.getElementById('account-email');
+  var codeEl = document.getElementById('verification-code');
+  var msgEl = document.getElementById('msg');
+  function show(step) {
+    ['step-1','step-2','step-3','step-4'].forEach(function (id) {
+      document.getElementById(id).classList.toggle('on', id === step);
+    });
+  }
+  function say(text, isErr) {
+    msgEl.textContent = text || '';
+    msgEl.className = 'msg' + (isErr ? ' err' : '');
+  }
+  function call(body) {
+    return fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
+  }
+  document.getElementById('btn-request').addEventListener('click', function () {
+    var email = emailEl.value.trim();
+    if (!email) { say('Add the email address you signed up with.', true); return; }
+    say('One moment…');
+    call({ step: 'request', email: email }).then(function (res) {
+      if (res.body && res.body.ok) {
+        say(res.body.message || 'If an account uses this email, a code is on its way.');
+        show('step-2');
+      } else {
+        say((res.body && res.body.reason) || 'That did not work. Try again later.', true);
+      }
+    }).catch(function () { say('That did not work. Try again later.', true); });
+  });
+  document.getElementById('btn-verify').addEventListener('click', function () {
+    var code = codeEl.value.trim();
+    if (!code) { say('Add the code from your email.', true); return; }
+    say('One moment…');
+    call({ step: 'verify', email: emailEl.value.trim(), otp: code }).then(function (res) {
+      if (res.body && res.body.ok && res.body.token) {
+        token = res.body.token;
+        return call({ step: 'confirm', token: token }).then(function (res2) {
+          if (res2.body && res2.body.ok && res2.body.summary) {
+            var s = res2.body.summary;
+            document.getElementById('counts').textContent =
+              s.posts + ' posts · ' + s.books + ' books · ' + s.thoughts + ' thoughts — all of this will be deleted.';
+            say('This is your last chance to stop.');
+            show('step-3');
+          } else {
+            say((res2.body && res2.body.reason) || 'That did not work. Try again.', true);
+          }
+        });
+      }
+      say((res.body && res.body.reason) || 'That code was not recognised.', true);
+    }).catch(function () { say('That did not work. Try again later.', true); });
+  });
+  document.getElementById('understand').addEventListener('change', function (e) {
+    document.getElementById('btn-execute').disabled = !e.target.checked;
+  });
+  document.getElementById('btn-execute').addEventListener('click', function () {
+    if (!token) { say('This deletion session has expired. Start again.', true); show('step-1'); return; }
+    say('Deleting…');
+    call({ step: 'execute', token: token, confirm: 'DELETE' }).then(function (res) {
+      if (res.body && res.body.ok && res.body.deleted) {
+        say('');
+        show('step-4');
+      } else {
+        say((res.body && res.body.reason) || 'Deletion did not finish. Try again.', true);
+      }
+    }).catch(function () { say('That did not work. Try again later.', true); });
+  });
+})();
+</script>
 
 <h2>4. What is deleted</h2>
 <p>4.1 When an account is deleted through this page, the following are removed:</p>
